@@ -3,18 +3,12 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE CONFIG
-# ══════════════════════════════════════════════════════════════════════════════
 st.set_page_config(
     page_title="Keterjangkauan Hunian Jawa Timur",
     page_icon="🏠", layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ══════════════════════════════════════════════════════════════════════════════
-# CSS
-# ══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -76,39 +70,34 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# LOAD DATA
-# ══════════════════════════════════════════════════════════════════════════════
+
 @st.cache_data
 def load_data():
     FILE = "ANALISIS_KETERJANGKAUAN_KPR.xlsx"
     xl   = pd.read_excel(FILE, sheet_name=None, engine="openpyxl")
 
-    # ── Per-tahun ─────────────────────────────────────────────────────────────
-    years, dfs = [2020,2021,2022,2023,2024,2025], []
-    for y in years:
-        df = xl[str(y)].copy()
-        df = df[df.iloc[:,0].notna() & df.iloc[:,0].astype(str).str.strip().ne("")]
-        df = df.iloc[:,:7]
-        df.columns = ["KABUPATEN_KOTA","UMK","BATAS_30","CICILAN","GARIS_KEMISKINAN","STATUS_LAJANG","STATUS_KELUARGA"]
-        df["UMK"]              = pd.to_numeric(df["UMK"],              errors="coerce")
-        df["CICILAN"]          = pd.to_numeric(df["CICILAN"],          errors="coerce")
-        df["GARIS_KEMISKINAN"] = pd.to_numeric(df["GARIS_KEMISKINAN"], errors="coerce")
-        df["BATAS_30"]         = df["UMK"] * 0.3
-        df["RESIDUAL"]         = df["UMK"] - df["CICILAN"] - df["GARIS_KEMISKINAN"]
-        df["STATUS_LAJANG"]    = df.apply(
-            lambda r: "Terjangkau" if (r["CICILAN"] <= r["BATAS_30"]) and (r["RESIDUAL"] >= 0)
-            else "Tidak Terjangkau", axis=1)
-        df["STATUS_KELUARGA"]  = df.apply(
-            lambda r: "Terjangkau" if (r["CICILAN"] <= r["BATAS_30"]) and (r["RESIDUAL"] >= r["GARIS_KEMISKINAN"]*2)
-            else "Tidak Terjangkau", axis=1)
-        df["TAHUN"] = y
-        df = df.dropna(subset=["UMK"])
-        df["KABUPATEN_KOTA"] = df["KABUPATEN_KOTA"].astype(str).str.strip().str.upper()
-        dfs.append(df)
-    main = pd.concat(dfs, ignore_index=True)
+    df = xl["union"].copy()
+    df = df[df.iloc[:,0].notna()]
+    df = df.iloc[:, :8]
+    df.columns = ["TAHUN","KABUPATEN_KOTA","UMK","BATAS_30",
+                  "CICILAN","GARIS_KEMISKINAN","STATUS_LAJANG","STATUS_KELUARGA"]
+    for col in ["UMK","CICILAN","GARIS_KEMISKINAN"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    df["TAHUN"]    = df["TAHUN"].astype(int)
+    df["BATAS_30"] = df["UMK"] * 0.3
+    df["RESIDUAL"] = df["UMK"] - df["CICILAN"] - df["GARIS_KEMISKINAN"]
+    df["STATUS_LAJANG"] = df.apply(
+        lambda r: "Terjangkau"
+        if (r["CICILAN"] <= r["BATAS_30"]) and (r["RESIDUAL"] >= 0)
+        else "Tidak Terjangkau", axis=1)
+    df["STATUS_KELUARGA"] = df.apply(
+        lambda r: "Terjangkau"
+        if (r["CICILAN"] <= r["BATAS_30"]) and (r["RESIDUAL"] >= r["GARIS_KEMISKINAN"]*2)
+        else "Tidak Terjangkau", axis=1)
+    df = df.dropna(subset=["UMK"])
+    df["KABUPATEN_KOTA"] = df["KABUPATEN_KOTA"].astype(str).str.strip().str.upper()
+    main = df.copy()
 
-    # ── IHPR ──────────────────────────────────────────────────────────────────
     ihpr = xl["IHPR SBY"].copy()
     ihpr.columns = ["TAHUN","TRIWULAN","TIPE_KECIL","TIPE_MENENGAH","TIPE_BESAR","TOTAL"]
     ihpr["TAHUN"] = ihpr["TAHUN"].ffill()
@@ -118,7 +107,6 @@ def load_data():
     for c in ["TIPE_KECIL","TIPE_MENENGAH","TIPE_BESAR","TOTAL"]:
         ihpr[c] = pd.to_numeric(ihpr[c], errors="coerce")
 
-    # ── Garis Kemiskinan ──────────────────────────────────────────────────────
     gk = xl["garis kemiskinan"].copy()
     gk = gk.iloc[:,:6]
     gk.columns = ["PERIODE","GK_KOTA","GK_DESA","MISKIN_KOTA","MISKIN_DESA","TOTAL_MISKIN"]
@@ -129,9 +117,8 @@ def load_data():
             gk[c].astype(str).str.replace(",","").str.replace("-","0").str.strip(),
             errors="coerce")
     gk = gk[gk["PERIODE"].astype(str).str.contains("202", na=False)]
-    gk = gk.dropna(subset=["GK_KOTA"])   # buang baris 2023 Sep yang kosong
+    gk = gk.dropna(subset=["GK_KOTA"])
 
-    # ── Kepemilikan Rumah ─────────────────────────────────────────────────────
     kp = xl["kepemilikan rumah"].copy()
     kp.columns = ["KAB_KOTA","MILIK","KONTRAK","LAINNYA","TOTAL"]
     kp = kp[kp["KAB_KOTA"].notna()]
@@ -141,7 +128,6 @@ def load_data():
         kp[c] = pd.to_numeric(
             kp[c].astype(str).str.replace("–","0").str.replace(",",""),
             errors="coerce").fillna(0)
-    # Normalkan nama: "Kota Surabaya" → "KOTA SURABAYA" agar bisa di-join
     kp["KAB_KOTA_UPPER"] = kp["KAB_KOTA"].astype(str).str.upper().str.strip()
 
     return main, ihpr, gk, kp
@@ -151,9 +137,6 @@ KAB_LIST = sorted(main_df["KABUPATEN_KOTA"].unique().tolist())
 YEARS    = [2020,2021,2022,2023,2024,2025]
 COLORS   = ["#6C5CE7","#E84393","#0984E3","#00B894","#FDCB6E","#A29BFE"]
 
-# ══════════════════════════════════════════════════════════════════════════════
-# SIDEBAR
-# ══════════════════════════════════════════════════════════════════════════════
 with st.sidebar:
     st.markdown("## 🏠 Keterjangkauan Hunian")
     st.markdown("**Jawa Timur 2020–2025**")
@@ -162,7 +145,6 @@ with st.sidebar:
     sel_year = st.selectbox("📅 Tahun", YEARS, index=5)
     sel_kab  = st.selectbox("📍 Kabupaten/Kota", ["Semua"] + KAB_LIST)
 
-    # Penjelasan pengaruh filter
     st.markdown("---")
     if sel_kab == "Semua":
         st.markdown("""<div style='font-size:12px;color:rgba(255,255,255,0.8);line-height:1.8;'>
@@ -186,25 +168,19 @@ with st.sidebar:
     • Kementerian PUPR (KPR FLPP)
     </div>""", unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# COMPUTED — shared across tabs
-# ══════════════════════════════════════════════════════════════════════════════
 df_year  = main_df[main_df["TAHUN"] == sel_year].copy()
 cicilan  = int(df_year["CICILAN"].iloc[0]) if not df_year.empty else 0
 
-# Mode: satu daerah vs semua
 is_single = sel_kab != "Semua"
 df_focus  = df_year[df_year["KABUPATEN_KOTA"] == sel_kab] if is_single else df_year
 df_trend_focus = main_df[main_df["KABUPATEN_KOTA"] == sel_kab] if is_single else main_df
 
-# KPI — selalu Jawa Timur level (gambaran besar)
 n_ok    = (df_year["STATUS_LAJANG"] == "Terjangkau").sum()
 n_no    = (df_year["STATUS_LAJANG"] == "Tidak Terjangkau").sum()
 total   = len(df_year)
 pct_ok  = round(n_ok / total * 100, 1) if total else 0
 umk_med = int(df_year["UMK"].median()) if not df_year.empty else 0
 
-# KPI untuk single mode
 if is_single and not df_focus.empty:
     kab_row      = df_focus.iloc[0]
     kab_umk      = int(kab_row["UMK"])
@@ -212,9 +188,6 @@ if is_single and not df_focus.empty:
     kab_status   = kab_row["STATUS_LAJANG"]
     kab_pct      = round(cicilan / kab_umk * 100, 1)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# HEADER
-# ══════════════════════════════════════════════════════════════════════════════
 if is_single:
     header_sub = f"Fokus: <b>{sel_kab.title()}</b> &nbsp;|&nbsp; Tahun <b>{sel_year}</b>"
 else:
@@ -233,11 +206,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# KPI CARDS — berubah tergantung mode
-# ══════════════════════════════════════════════════════════════════════════════
 if is_single and not df_focus.empty:
-    # Mode satu daerah: tampilkan data spesifik daerah itu
     k1,k2,k3,k4,k5 = st.columns(5)
     with k1:
         st.markdown(f"""<div class="kpi-card {'green' if kab_status=='Terjangkau' else 'red'}">
@@ -253,7 +222,7 @@ if is_single and not df_focus.empty:
         </div>""", unsafe_allow_html=True)
     with k3:
         st.markdown(f"""<div class="kpi-card gold">
-          <div class="kpi-label">💸 Cicilan KPR FLPP</div>
+          <div class="kpi-label">Cicilan KPR FLPP</div>
           <div class="kpi-value" style='font-size:18px;'>Rp {cicilan:,}</div>
           <div class="kpi-sub">{kab_pct}% dari UMK</div>
         </div>""", unsafe_allow_html=True)
@@ -262,7 +231,7 @@ if is_single and not df_focus.empty:
         st.markdown(f"""<div class="kpi-card {rc}">
           <div class="kpi-label">Residual Income</div>
           <div class="kpi-value" style='font-size:18px;'>Rp {kab_residual:,}</div>
-          <div class="kpi-sub">sisa setelah cicilan & GK</div>
+          <div class="kpi-sub">Sisa gaji setelah cicilan dan kebutuhan hidup minimum</div>
         </div>""", unsafe_allow_html=True)
     with k5:
         rank = df_year["UMK"].rank(ascending=False).loc[df_focus.index[0]]
@@ -272,7 +241,6 @@ if is_single and not df_focus.empty:
           <div class="kpi-sub">dari 38 daerah</div>
         </div>""", unsafe_allow_html=True)
 else:
-    # Mode Jawa Timur: gambaran besar
     k1,k2,k3,k4,k5 = st.columns(5)
     with k1:
         st.markdown(f"""<div class="kpi-card green">
@@ -294,22 +262,19 @@ else:
         </div>""", unsafe_allow_html=True)
     with k4:
         st.markdown(f"""<div class="kpi-card gold">
-          <div class="kpi-label">💸 Cicilan KPR FLPP</div>
+          <div class="kpi-label">Cicilan KPR FLPP</div>
           <div class="kpi-value" style='font-size:18px;'>Rp {cicilan:,}</div>
           <div class="kpi-sub">per bulan {sel_year}</div>
         </div>""", unsafe_allow_html=True)
     with k5:
         st.markdown(f"""<div class="kpi-card blue">
-          <div class="kpi-label">📈 Median UMK</div>
+          <div class="kpi-label">Median UMK</div>
           <div class="kpi-value" style='font-size:18px;'>Rp {umk_med:,}</div>
           <div class="kpi-sub">se-Jawa Timur</div>
         </div>""", unsafe_allow_html=True)
 
 st.markdown("---")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# TABS
-# ══════════════════════════════════════════════════════════════════════════════
 t1,t2,t3,t4,t5,t6,t7 = st.tabs([
     "📊 Status & Proporsi",
     "💰 UMK vs Cicilan",
@@ -320,69 +285,35 @@ t1,t2,t3,t4,t5,t6,t7 = st.tabs([
     "📋 Tabel & Glosarium",
 ])
 
-# ──────────────────────────────────────────────────────────────────────────────
-# TAB 1 — STATUS & PROPORSI
-# Filter Tahun: ✅ aktif | Filter Kota: ✅ aktif (ganti konteks)
-# ──────────────────────────────────────────────────────────────────────────────
 with t1:
     if is_single:
-        # ── MODE SINGLE: detail historis satu daerah ──────────────────────────
         st.markdown(f'<div class="sec-q">📍 Bagaimana riwayat keterjangkauan <b>{sel_kab.title()}</b> dari 2020 hingga 2025? Apakah kondisinya membaik?</div>', unsafe_allow_html=True)
 
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown('<div class="sec-title">Tren Status Keterjangkauan (Lajang vs Keluarga)</div>', unsafe_allow_html=True)
-            hist = df_trend_focus[["TAHUN","UMK","CICILAN","BATAS_30","RESIDUAL","STATUS_LAJANG","STATUS_KELUARGA"]].copy()
+        hist = df_trend_focus[["TAHUN","UMK","CICILAN","BATAS_30","RESIDUAL","STATUS_LAJANG","STATUS_KELUARGA"]].copy()
 
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=hist["TAHUN"], y=hist["UMK"],
-                name="UMK", mode="lines+markers",
-                line=dict(color="#6C5CE7",width=2.5), marker=dict(size=8)))
-            fig.add_trace(go.Scatter(x=hist["TAHUN"], y=hist["CICILAN"],
-                name="Cicilan KPR FLPP", mode="lines+markers",
-                line=dict(color="#D63031",dash="dot",width=2.5), marker=dict(symbol="diamond",size=8,color="#D63031")))
-            fig.add_trace(go.Scatter(x=hist["TAHUN"], y=hist["BATAS_30"],
-                name="Batas 30% UMK", mode="lines",
-                line=dict(color="#FDCB6E",dash="dash",width=1.5)))
+        st.markdown('<div class="sec-title">Tabel Ringkasan per Tahun</div>', unsafe_allow_html=True)
+        tbl_hist = hist[["TAHUN","UMK","CICILAN","BATAS_30","RESIDUAL","STATUS_LAJANG"]].copy()
+        tbl_hist.columns = ["Tahun","UMK","Cicilan","Batas 30%","Residual","Status"]
+        tbl_hist["% Cicilan"] = (tbl_hist["Cicilan"]/tbl_hist["UMK"]*100).round(1).astype(str)+"%"
 
-            # Warnai area status
-            for _, r in hist.iterrows():
-                col = "rgba(0,184,148,0.15)" if r["STATUS_LAJANG"]=="Terjangkau" else "rgba(214,48,49,0.1)"
-                fig.add_vrect(x0=r["TAHUN"]-0.4, x1=r["TAHUN"]+0.4, fillcolor=col, line_width=0)
+        def clr(v):
+            if v == "Terjangkau": return "background:#d4edda;color:#155724;font-weight:700"
+            return "background:#f8d7da;color:#721c24;font-weight:700"
 
-            fig.update_layout(height=340, margin=dict(l=0,r=0,t=10,b=0),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(showgrid=False, tickmode="linear"),
-                yaxis=dict(showgrid=True, gridcolor="#EEE", title="Rp", tickformat=","),
-                legend=dict(bgcolor="rgba(255,255,255,0.85)"))
-            st.plotly_chart(fig, use_container_width=True)
+        styled = tbl_hist.style.map(clr, subset=["Status"]).format({
+            "UMK":"Rp {:,.0f}", "Cicilan":"Rp {:,.0f}",
+            "Batas 30%":"Rp {:,.0f}", "Residual":"Rp {:,.0f}"})
+        st.dataframe(styled, use_container_width=True, height=280)
 
-        with c2:
-            st.markdown('<div class="sec-title">Tabel Ringkasan per Tahun</div>', unsafe_allow_html=True)
-            tbl_hist = hist[["TAHUN","UMK","CICILAN","BATAS_30","RESIDUAL","STATUS_LAJANG"]].copy()
-            tbl_hist.columns = ["Tahun","UMK","Cicilan","Batas 30%","Residual","Status"]
-            tbl_hist["% Cicilan"] = (tbl_hist["Cicilan"]/tbl_hist["UMK"]*100).round(1).astype(str)+"%"
-
-            def clr(v):
-                if v == "Terjangkau": return "background:#d4edda;color:#155724;font-weight:700"
-                return "background:#f8d7da;color:#721c24;font-weight:700"
-
-            styled = tbl_hist.style.map(clr, subset=["Status"]).format({
-                "UMK":"Rp {:,.0f}", "Cicilan":"Rp {:,.0f}",
-                "Batas 30%":"Rp {:,.0f}", "Residual":"Rp {:,.0f}"})
-            st.dataframe(styled, use_container_width=True, height=280)
-
-            # Status summary
-            n_aman_hist = (hist["STATUS_LAJANG"]=="Terjangkau").sum()
-            st.markdown(f"""<div class="sec-insight">
-              📌 <b>{sel_kab.title()}</b> terjangkau di <b>{n_aman_hist} dari 6 tahun</b> (2020–2025).<br>
-              Persentase cicilan terhadap UMK: kisaran
-              <b>{round(hist['CICILAN'].iloc[0]/hist['UMK'].iloc[0]*100,1)}%</b> (2020) →
-              <b>{round(hist['CICILAN'].iloc[-1]/hist['UMK'].iloc[-1]*100,1)}%</b> (2025).
-            </div>""", unsafe_allow_html=True)
+        n_aman_hist = (hist["STATUS_LAJANG"]=="Terjangkau").sum()
+        st.markdown(f"""<div class="sec-insight">
+          📌 <b>{sel_kab.title()}</b> terjangkau di <b>{n_aman_hist} dari 6 tahun</b> (2020–2025).<br>
+          Persentase cicilan terhadap UMK: kisaran
+          <b>{round(hist['CICILAN'].iloc[0]/hist['UMK'].iloc[0]*100,1)}%</b> (2020) →
+          <b>{round(hist['CICILAN'].iloc[-1]/hist['UMK'].iloc[-1]*100,1)}%</b> (2025).
+        </div>""", unsafe_allow_html=True)
 
     else:
-        # ── MODE SEMUA: proporsi + tren Jawa Timur ────────────────────────────
         st.markdown(f'<div class="sec-q">🤔 Dari 38 kabupaten/kota di Jawa Timur, berapa yang terjangkau di tahun <b>{sel_year}</b>? Apakah kondisinya membaik dari tahun ke tahun?</div>', unsafe_allow_html=True)
 
         c1, c2 = st.columns(2)
@@ -429,14 +360,9 @@ with t1:
               menggeser daerah-daerah di bawah ambang keterjangkauan.
             </div>""", unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# TAB 2 — UMK VS CICILAN
-# Filter Tahun: ✅ aktif | Filter Kota: ✅ aktif (highlight)
-# ──────────────────────────────────────────────────────────────────────────────
 with t2:
     st.markdown(f'<div class="sec-q">💡 Seberapa besar gap antara UMK tiap daerah dengan cicilan KPR FLPP di tahun <b>{sel_year}</b>?{" Daerah <b>" + sel_kab.title() + "</b> ditandai khusus." if is_single else ""}</div>', unsafe_allow_html=True)
 
-    # ── Banner info — tampil SEBELUM grafik ────────────────────────────────────
     if is_single and not df_focus.empty:
         kab_umk_val = float(df_focus["UMK"].iloc[0])
         kab_pct_cic = round(cicilan / kab_umk_val * 100, 1)
@@ -491,11 +417,9 @@ with t2:
 
     df_s = df_year.sort_values("UMK").copy()
     df_s["LABEL"] = df_s["KABUPATEN_KOTA"].str.replace("KABUPATEN ","KAB. ")
-
-    # Warna: highlight daerah yang dipilih
     def get_color(row):
         if is_single and row["KABUPATEN_KOTA"] == sel_kab:
-            return "#FDCB6E"   # kuning emas = highlight
+            return "#FDCB6E"
         return "#00B894" if row["STATUS_LAJANG"]=="Terjangkau" else "#D63031"
 
     df_s["COLOR"] = df_s.apply(get_color, axis=1)
@@ -512,8 +436,6 @@ with t2:
     fig3.add_vline(x=cicilan, line_dash="dash", line_color="#FF6B6B", line_width=2,
         annotation_text=f"  Cicilan KPR: Rp {cicilan:,}",
         annotation_font_color="#CC0000", annotation_position="top")
-
-    # Highlight daerah terpilih — status ditampilkan di insight box bawah
     fig3.update_layout(height=980, showlegend=False,
         margin=dict(l=10, r=160, t=30, b=10),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
@@ -521,11 +443,6 @@ with t2:
         yaxis=dict(showgrid=False,tickfont_size=10))
     st.plotly_chart(fig3, use_container_width=True)
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# TAB 3 — TREN UMK
-# Filter Tahun: ✅ (marker aktif tahun terpilih) | Filter Kota: ✅ aktif
-# ──────────────────────────────────────────────────────────────────────────────
 with t3:
     if is_single:
         kabs_show = [sel_kab]
@@ -534,7 +451,6 @@ with t3:
         kabs_show = df_year.nlargest(5,"UMK")["KABUPATEN_KOTA"].tolist()
         note      = "5 Daerah UMK Tertinggi"
 
-    # ── Header ────────────────────────────────────────────────────────────────
     if is_single:
         st.markdown(f"""
         <div class="sec-q">
@@ -550,7 +466,6 @@ with t3:
         </div>
         """, unsafe_allow_html=True)
 
-    # ── Panduan baca singkat ──────────────────────────────────────────────────
     st.markdown("""
     <div style='background:#FFF9E6;border-radius:8px;padding:9px 16px;
          margin-bottom:10px;border-left:3px solid #FDCB6E;font-size:13px;color:#555;'>
@@ -569,12 +484,11 @@ with t3:
         d   = trend[trend["KABUPATEN_KOTA"]==kab]
         lbl = kab.replace("KABUPATEN ","KAB. ")
         c   = COLORS[i % len(COLORS)]
-        fig4.add_trace(go.Bar(x=d["TAHUN"],y=d["UMK"],name=lbl,
-            marker_color=c,opacity=0.75,offsetgroup=i,
-            hovertemplate=f"<b>{lbl}</b><br>%{{x}} — UMK: Rp %{{y:,.0f}}<extra></extra>"))
         fig4.add_trace(go.Scatter(x=d["TAHUN"],y=d["UMK"],
-            mode="lines+markers",showlegend=False,
-            line=dict(color=c,width=2),marker=dict(size=6,color=c)))
+            name=lbl, mode="lines+markers",
+            line=dict(color=c,width=2.5),
+            marker=dict(size=8,color=c),
+            hovertemplate=f"<b>{lbl}</b><br>%{{x}} — UMK: Rp %{{y:,.0f}}<extra></extra>"))
 
     fig4.add_trace(go.Scatter(x=cic_yr["TAHUN"],y=cic_yr["CICILAN"],
         mode="lines+markers",name="Cicilan KPR FLPP",
@@ -582,12 +496,7 @@ with t3:
         marker=dict(symbol="diamond",size=9,color="#D63031"),
         hovertemplate="Cicilan KPR FLPP<br>%{x}: Rp %{y:,.0f}<extra></extra>"))
 
-    fig4.add_vline(x=sel_year, line_dash="solid",
-        line_color="rgba(108,92,231,0.2)", line_width=20,
-        annotation_text=f"  {sel_year}",
-        annotation_font_color="#6C5CE7", annotation_position="top")
-
-    fig4.update_layout(height=420, barmode="group",
+    fig4.update_layout(height=420,
         margin=dict(l=0,r=0,t=30,b=0),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(showgrid=False, tickmode="linear", title="Tahun"),
@@ -595,7 +504,6 @@ with t3:
         legend=dict(bgcolor="rgba(255,255,255,0.85)", font_size=11))
     st.plotly_chart(fig4, use_container_width=True)
 
-    # ── Insight ───────────────────────────────────────────────────────────────
     if is_single and not df_focus.empty:
         umk_2020   = main_df[(main_df["KABUPATEN_KOTA"]==sel_kab)&(main_df["TAHUN"]==2020)]["UMK"].iloc[0]
         umk_2025   = main_df[(main_df["KABUPATEN_KOTA"]==sel_kab)&(main_df["TAHUN"]==2025)]["UMK"].iloc[0]
@@ -655,11 +563,6 @@ with t3:
           </span>
         </div>""", unsafe_allow_html=True)
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# TAB 4 — IHPR PROPERTI
-# Filter Tahun: ✅ (marker) | Filter Kota: tidak relevan, tetap tampil + note
-# ──────────────────────────────────────────────────────────────────────────────
 with t4:
     st.markdown('<div class="sec-q">🏗️ Bagaimana tren harga properti residensial di Surabaya? Tipe rumah mana yang naik paling cepat — dan apa dampaknya terhadap keterjangkauan?</div>', unsafe_allow_html=True)
 
@@ -682,12 +585,9 @@ with t4:
                 name=name,mode="lines+markers",
                 line=dict(width=2.5,color=color),marker=dict(size=6),
                 hovertemplate=f"<b>{name}</b><br>%{{x}}<br>Indeks: %{{y:.2f}}<extra></extra>"))
-
-        # Tandai kuartal dari tahun yang dipilih
         mark_periods = ihpr_df[ihpr_df["TAHUN_INT"]==sel_year]["PERIODE"].tolist()
         for mp in mark_periods:
             fig5.add_vline(x=mp, line_dash="dot", line_color="rgba(108,92,231,0.4)", line_width=1.5)
-
         fig5.update_layout(height=380,margin=dict(l=0,r=0,t=10,b=0),
             paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
             xaxis=dict(showgrid=False,tickangle=-45,tickfont_size=9),
@@ -698,7 +598,6 @@ with t4:
 
     with c2:
         st.markdown('<div class="sec-title">Cara Membaca Grafik Ini</div>', unsafe_allow_html=True)
-        # Cari nilai IHPR untuk tahun terpilih
         ihpr_sel = ihpr_df[ihpr_df["TAHUN_INT"]==sel_year]
         if not ihpr_sel.empty:
             avg_k = ihpr_sel["TIPE_KECIL"].mean()
@@ -720,10 +619,6 @@ with t4:
               di luar cakupan data IHPR.
             </div>""", unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# TAB 5 — SOSIAL EKONOMI
-# Filter Tahun: ✅ (marker GK) | Filter Kota: ✅ (kepemilikan rumah)
-# ──────────────────────────────────────────────────────────────────────────────
 with t5:
     st.markdown('<div class="sec-q">🌍 Bagaimana konteks sosial ekonomi yang memperparah krisis keterjangkauan hunian — dari sisi kepemilikan rumah dan tren kemiskinan?</div>', unsafe_allow_html=True)
 
@@ -732,13 +627,10 @@ with t5:
         st.markdown(f'<div class="sec-title">Kepemilikan Rumah{" — " + sel_kab.title() if is_single else " — Seluruh Jawa Timur"}</div>', unsafe_allow_html=True)
 
         if is_single:
-            # Cari data kepemilikan untuk daerah yang dipilih
-            # Normalisasi: "KOTA SURABAYA" → "Kota Surabaya"
             kab_clean = sel_kab.replace("KABUPATEN ","").replace("KOTA ","").title()
             kp_f = kp_df[kp_df["KAB_KOTA"].str.contains(kab_clean, case=False, na=False)]
-
             if not kp_f.empty:
-                row_kp  = kp_f.iloc[0]
+                row_kp   = kp_f.iloc[0]
                 total_kp = row_kp["MILIK"] + row_kp["KONTRAK"] + row_kp["LAINNYA"]
                 fig_kp = go.Figure(go.Pie(
                     labels=["Milik Sendiri","Kontrak/Sewa","Lainnya"],
@@ -760,7 +652,6 @@ with t5:
             else:
                 st.info(f"Data kepemilikan rumah untuk {sel_kab.title()} tidak tersedia.")
         else:
-            # Tampilkan semua daerah dalam stacked bar
             kp_m = kp_df[~kp_df["KAB_KOTA"].str.upper().isin(["JAWA TIMUR"])].melt(
                 id_vars="KAB_KOTA", value_vars=["MILIK","KONTRAK","LAINNYA"],
                 var_name="KATEGORI", value_name="JUMLAH")
@@ -791,13 +682,10 @@ with t5:
             name="Perdesaan",mode="lines+markers",
             line=dict(color="#00B894",width=2.5),marker=dict(size=6),
             hovertemplate="Desa<br>%{x}<br>Rp %{y:,.0f}<extra></extra>"))
-
-        # Highlight periode dari tahun terpilih
         gk_sel = gk_df[gk_df["PERIODE"].astype(str).str.contains(str(sel_year))]
         for _, rr in gk_sel.iterrows():
             fig7.add_vline(x=rr["PERIODE"], line_dash="dot",
                 line_color="rgba(253,203,110,0.6)", line_width=2)
-
         fig7.update_layout(height=210,margin=dict(l=0,r=0,t=10,b=0),
             paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="rgba(0,0,0,0)",
             xaxis=dict(showgrid=False,tickangle=-30,tickfont_size=9,title=""),
@@ -823,10 +711,6 @@ with t5:
       sementara UMK banyak daerah tidak cukup mengimbangi keduanya.
     </div>""", unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# TAB 6 — KALKULATOR
-# Filter Tahun: ✅ prefill | Filter Kota: ✅ prefill
-# ──────────────────────────────────────────────────────────────────────────────
 with t6:
     st.markdown('<div class="sec-q">🧮 Dengan gaji yang kamu miliki, apakah kamu mampu membeli rumah subsidi KPR FLPP? Filter tahun & daerah di sidebar sudah di-prefill otomatis.</div>', unsafe_allow_html=True)
 
@@ -841,7 +725,6 @@ with t6:
             min_value=0, max_value=50_000_000,
             value=3_000_000, step=100_000, format="%d")
     with ck2:
-        # Prefill dari filter sidebar
         default_idx = KAB_LIST.index(sel_kab) if is_single and sel_kab in KAB_LIST else 0
         user_kab = st.selectbox("📍 Daerahmu", KAB_LIST, index=default_idx, key="kk")
     with ck3:
@@ -898,10 +781,6 @@ with t6:
                  else f'⚠️ Gajimu di bawah UMK (selisih Rp {umk_val-user_gaji:,.0f})'}
             </div>""", unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# TAB 7 — TABEL & GLOSARIUM
-# Filter Tahun: ✅ | Filter Kota: ✅ (highlight baris)
-# ──────────────────────────────────────────────────────────────────────────────
 with t7:
     sub1, sub2 = st.tabs(["📋 Tabel Data", "📚 Glosarium & Metodologi"])
     with sub1:
@@ -947,11 +826,11 @@ with t7:
             ("Housing Stress",
              "Kondisi cicilan KPR >30% penghasilan. Dalam dashboard ini: sebuah daerah Housing Stress jika cicilan FLPP melampaui 30% UMK-nya."),
             ("Residual Income",
-             "Sisa pendapatan setelah cicilan KPR dan Garis Kemiskinan. Formula: UMK − Cicilan − GK. Terjangkau hanya jika Residual Income ≥ 0 DAN cicilan ≤ 30% UMK."),
+             "Sisa pendapatan setelah cicilan KPR dan Garis Kemiskinan. Formula: UMK − Cicilan − Garis Kemiskinan. Terjangkau hanya jika Residual Income ≥ 0 DAN cicilan ≤ 30% UMK."),
             ("IHPR — Indeks Harga Properti Residensial",
              "Indeks Bank Indonesia untuk kecepatan kenaikan harga properti. Dasar 2018=100. Indeks 111 → harga naik 11% sejak 2018."),
             ("Garis Kemiskinan",
-             "Pengeluaran minimum per kapita/bulan untuk kebutuhan dasar (BPS). Dipakai sebagai proxy biaya hidup minimum dalam formula Residual Income."),
+             "Pengeluaran minimum per kapita/bulan untuk kebutuhan dasar (BPS). Dipakai sebagai proksi biaya hidup minimum dalam formula Residual Income."),
         ]
         for term, defn in glossary:
             st.markdown(f"""<div class="gloss-box">
@@ -964,12 +843,9 @@ with t7:
           Batas 30%  =  UMK × 30%<br>
           Residual Income  =  UMK − Cicilan KPR − Garis Kemiskinan<br>
           Status Lajang  =  "Terjangkau" jika Cicilan ≤ Batas 30% <b>DAN</b> Residual Income ≥ 0<br>
-          Status Kel. Kecil  =  "Terjangkau" jika Cicilan ≤ Batas 30% <b>DAN</b> Residual Income ≥ GK × 2
+          Status Kel. Kecil  =  "Terjangkau" jika Cicilan ≤ Batas 30% <b>DAN</b> Residual Income ≥ 2x Garis Kemiskinan
         </div>""", unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# FOOTER
-# ══════════════════════════════════════════════════════════════════════════════
 st.markdown("""
 <div style='text-align:center;margin-top:30px;padding:16px;
      background:linear-gradient(135deg,#2D2B55,#4A3F9F);
