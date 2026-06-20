@@ -49,10 +49,10 @@ div[data-baseweb="popover"] li {
     color: white !important;
 }
 [data-testid="stDataFrame"], [data-testid="stDataFrame"] div[data-testid="stTable"] {
-    background-color: transparent !important;
+    background-color: #000000 !important;
 }
 [data-testid="stDataFrame"] th, [data-testid="stDataFrame"] td {
-    background-color: rgba(255, 255, 255, 0.05) !important;
+    background-color: #000000 !important;
     color: white !important;
     border-color: rgba(255, 255, 255, 0.1) !important;
 }
@@ -212,9 +212,9 @@ section[data-testid="stSidebar"] {{
     top: 0; left: 0; right: 0; height: 3px;
     border-radius: var(--radius) var(--radius) 0 0;
 }}
-.kpi-card.purple::before {{ background: linear-gradient(90deg, #977DFF, #0033FF); }}
+.kpi-card.purple::before {{ background: linear-gradient(90deg, #6C5DD3, var(--purple-dark2)); }}
 .kpi-card.green::before  {{ background: linear-gradient(90deg, #6C5DD3, var(--purple-dark2)); }}
-.kpi-card.red::before    {{ background: linear-gradient(90deg, #977DFF, #6C5DD3); }}
+.kpi-card.red::before    {{ background: linear-gradient(90deg, var(--purple-dark2), var(--purple-dark3)); }}
 .kpi-card.gold::before   {{ background: linear-gradient(90deg, var(--purple-dark2), var(--purple-dark3)); }}
 .kpi-card.blue::before   {{ background: linear-gradient(90deg, #5B4B9E, var(--purple-dark3)); }}
 .kpi-card.pink::before   {{ background: linear-gradient(90deg, #F2E6EE, #977DFF); }}
@@ -222,9 +222,9 @@ section[data-testid="stSidebar"] {{
     position: absolute; width: 70px; height: 70px;
     border-radius: 50%; opacity: 0.12; top: -15px; right: -15px; filter: blur(18px);
 }}
-.kpi-card.purple .kpi-glow {{ background: #977DFF; }}
+.kpi-card.purple .kpi-glow {{ background: #6C5DD3; }}
 .kpi-card.green .kpi-glow  {{ background: #6C5DD3; }}
-.kpi-card.red .kpi-glow    {{ background: #977DFF; }}
+.kpi-card.red .kpi-glow    {{ background: var(--purple-dark2); }}
 .kpi-card.gold .kpi-glow   {{ background: var(--purple-dark2); }}
 .kpi-card.blue .kpi-glow   {{ background: #5B4B9E; }}
 .kpi-card.pink .kpi-glow   {{ background: #F2E6EE; }}
@@ -456,10 +456,20 @@ div[data-testid="stHorizontalBlock"] .stButton > button:hover {{
 }}
 
 /* Number input */
-.stNumberInput input {{
-    background: rgba(255,255,255,0.10) !important;
+.stNumberInput input,
+.stNumberInput > div,
+.stNumberInput > div > div,
+[data-testid="stNumberInput"] input,
+[data-testid="stNumberInput"] > div {{
+    background: #111111 !important;
+    background-color: #111111 !important;
     border: 1px solid rgba(255,255,255,0.20) !important;
     border-radius: 8px !important;
+    color: white !important;
+}}
+.stNumberInput [data-testid="stNumberInputStepDown"],
+.stNumberInput [data-testid="stNumberInputStepUp"] {{
+    background: #222222 !important;
     color: white !important;
 }}
 
@@ -499,23 +509,30 @@ div[data-testid="stHorizontalBlock"] .stButton > button:hover {{
     color: white !important; border-radius: 8px !important; font-weight: 600 !important;
 }}
 
-/* Dataframe */
-.stDataFrame, [data-testid="stDataFrameResizable"] {{ background: transparent !important; }}
-.stDataFrame [data-testid="stDataFrameResizable"] > div {{
-    background: rgba(255,255,255,0.06) !important;
-    border: 1px solid rgba(255,255,255,0.14) !important;
-    border-radius: var(--radius) !important;
+/* Dataframe - aggressive black background */
+.stDataFrame, [data-testid="stDataFrameResizable"],
+.stDataFrame > div, [data-testid="stDataFrameResizable"] > div,
+.stDataFrame iframe, [data-testid="stDataFrameResizable"] iframe,
+[data-testid="stDataFrame"], [data-testid="stDataFrame"] > div,
+[data-testid="stDataFrame"] > div > div,
+[data-testid="stDataFrame"] > div > div > div {{
+    background: #0a0a0a !important;
+    background-color: #0a0a0a !important;
 }}
-[data-testid="stDataFrame"] thead tr th {{
-    background: rgba(151,125,255,0.18) !important;
+[data-testid="stDataFrame"] thead tr th,
+[data-testid="stDataFrame"] th {{
+    background: rgba(151,125,255,0.25) !important;
+    background-color: rgba(151,125,255,0.25) !important;
     color: white !important;
 }}
-[data-testid="stDataFrame"] tbody tr td {{
-    background: rgba(255,255,255,0.04) !important;
+[data-testid="stDataFrame"] tbody tr td,
+[data-testid="stDataFrame"] td {{
+    background: #0a0a0a !important;
+    background-color: #0a0a0a !important;
     color: rgba(255,255,255,0.85) !important;
 }}
 [data-testid="stDataFrame"] tbody tr:hover td {{
-    background: rgba(151,125,255,0.10) !important;
+    background: rgba(151,125,255,0.15) !important;
 }}
 
 /* General text */
@@ -789,10 +806,36 @@ elif page == 0:
             if v == "Terjangkau": return "background:rgba(0,229,160,0.18);color:#00E5A0;font-weight:700"
             return "background:rgba(255,77,109,0.18);color:#FF4D6D;font-weight:700"
 
-        styled = tbl_hist.style.map(clr, subset=["Status"]).format({
-            "UMK":"Rp {:,.0f}", "Cicilan":"Rp {:,.0f}",
-            "Batas 30%":"Rp {:,.0f}", "Residual":"Rp {:,.0f}"})
-        st.dataframe(styled, use_container_width=True, height=260)
+        # Render sebagai HTML table agar background bisa dikontrol
+        fmt_tbl = tbl_hist.copy()
+        fmt_tbl["UMK"]      = fmt_tbl["UMK"].apply(lambda v: f"Rp {v:,.0f}")
+        fmt_tbl["Cicilan"]  = fmt_tbl["Cicilan"].apply(lambda v: f"Rp {v:,.0f}")
+        fmt_tbl["Batas 30%"]= fmt_tbl["Batas 30%"].apply(lambda v: f"Rp {v:,.0f}")
+        fmt_tbl["Residual"] = fmt_tbl["Residual"].apply(lambda v: f"Rp {v:,.0f}")
+
+        rows_html = ""
+        for _, row in fmt_tbl.iterrows():
+            status_style = ("background:rgba(0,229,160,0.20);color:#00E5A0;font-weight:700"
+                            if row["Status"]=="Terjangkau"
+                            else "background:rgba(255,77,109,0.20);color:#FF4D6D;font-weight:700")
+            rows_html += f"""<tr>
+              <td style='background:#0a0a0a;color:rgba(255,255,255,0.85);padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.07);'>{row['Tahun']}</td>
+              <td style='background:#0a0a0a;color:rgba(255,255,255,0.85);padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.07);'>{row['UMK']}</td>
+              <td style='background:#0a0a0a;color:rgba(255,255,255,0.85);padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.07);'>{row['Cicilan']}</td>
+              <td style='background:#0a0a0a;color:rgba(255,255,255,0.85);padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.07);'>{row['Batas 30%']}</td>
+              <td style='background:#0a0a0a;color:rgba(255,255,255,0.85);padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.07);'>{row['Residual']}</td>
+              <td style='{status_style};padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.07);text-align:center;border-radius:4px;'>{row['Status']}</td>
+              <td style='background:#0a0a0a;color:rgba(255,255,255,0.85);padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.07);'>{row['% Cicilan']}</td>
+            </tr>"""
+        st.markdown(f"""
+        <div style='overflow-x:auto;border-radius:8px;border:1px solid rgba(255,255,255,0.12);'>
+        <table style='width:100%;border-collapse:collapse;background:#0a0a0a;'>
+          <thead><tr>
+            {''.join(f"<th style='background:rgba(151,125,255,0.25);color:white;padding:8px 10px;font-size:11px;font-weight:700;text-align:left;border-bottom:1px solid rgba(255,255,255,0.15);'>{c}</th>" for c in fmt_tbl.columns)}
+          </tr></thead>
+          <tbody>{rows_html}</tbody>
+        </table></div>
+        """, unsafe_allow_html=True)
 
         n_aman_hist = (hist["STATUS_LAJANG"]=="Terjangkau").sum()
         st.markdown(f"""<div class="sec-insight">
@@ -903,7 +946,13 @@ elif page == 1:
     with st.container(border=True):
         st.markdown(f'<div class="sec-title">UMK vs Cicilan KPR FLPP — Semua Kab/Kota ({sel_year})</div>', unsafe_allow_html=True)
 
-        df_s = df_year.sort_values("UMK", ascending=True).copy()
+        # Sort: Tidak Terjangkau dulu (UMK kecil→besar), lalu Terjangkau (UMK kecil→besar)
+        # Karena horizontal bar chart plotly menampilkan dari bawah ke atas,
+        # kita taruh Terjangkau di index awal agar muncul di BAWAH, Tidak Terjangkau di atas
+        # Tapi user minta Terjangkau di ATAS → sort Terjangkau terakhir (index tinggi = atas di chart)
+        df_no_sort = df_year[df_year["STATUS_LAJANG"]!="Terjangkau"].sort_values("UMK", ascending=True)
+        df_ok_sort = df_year[df_year["STATUS_LAJANG"]=="Terjangkau"].sort_values("UMK", ascending=True)
+        df_s = pd.concat([df_no_sort, df_ok_sort], ignore_index=True)
         df_s["LABEL"] = df_s["KABUPATEN_KOTA"].str.replace("KABUPATEN ","KAB. ")
         def get_color(row):
             if is_single and row["KABUPATEN_KOTA"] == sel_kab: return "#FFD166"
@@ -911,24 +960,30 @@ elif page == 1:
         df_s["COLOR"]   = df_s.apply(get_color, axis=1)
         df_s["BATAS30"] = df_s["UMK"] * 0.3
 
+        # Urutan kategori Y: list dari bawah ke atas
+        category_order = df_s["LABEL"].tolist()
+
         fig3 = go.Figure()
-        df_ok = df_s[df_s["STATUS_LAJANG"]=="Terjangkau"]
-        df_no = df_s[df_s["STATUS_LAJANG"]!="Terjangkau"]
 
+        # Trace tunggal UMK dengan warna per bar
         fig3.add_trace(go.Bar(
-            y=df_ok["LABEL"], x=df_ok["UMK"], orientation="h", name="Terjangkau",
-            marker=dict(color="#00E5A0", line=dict(width=0)),
-            text=df_ok["UMK"].apply(lambda x: f"Rp {x/1e6:.2f}jt"),
+            y=df_s["LABEL"], x=df_s["UMK"], orientation="h",
+            name="UMK",
+            marker=dict(color=df_s["COLOR"].tolist(), line=dict(width=0)),
+            text=df_s["UMK"].apply(lambda x: f"Rp {x/1e6:.2f}jt"),
             textposition="outside", textfont=dict(size=9, color="rgba(255,255,255,0.60)"),
-            hovertemplate="<b>%{y}</b><br>UMK: Rp %{x:,.0f}<extra></extra>"))
+            hovertemplate="<b>%{y}</b><br>UMK: Rp %{x:,.0f}<extra></extra>",
+            showlegend=False))
 
+        # Legend dummy untuk Terjangkau & Tidak Terjangkau
         fig3.add_trace(go.Bar(
-            y=df_no["LABEL"], x=df_no["UMK"], orientation="h", name="Tidak Terjangkau",
-            marker=dict(color="#FF4D6D", line=dict(width=0)),
-            text=df_no["UMK"].apply(lambda x: f"Rp {x/1e6:.2f}jt"),
-            textposition="outside", textfont=dict(size=9, color="rgba(255,255,255,0.60)"),
-            hovertemplate="<b>%{y}</b><br>UMK: Rp %{x:,.0f}<extra></extra>"))
+            y=[None], x=[None], orientation="h", name="Terjangkau",
+            marker=dict(color="#00E5A0"), showlegend=True))
+        fig3.add_trace(go.Bar(
+            y=[None], x=[None], orientation="h", name="Tidak Terjangkau",
+            marker=dict(color="#FF4D6D"), showlegend=True))
 
+        # Batas 30%
         fig3.add_trace(go.Bar(
             y=df_s["LABEL"], x=df_s["BATAS30"], orientation="h", name="Batas 30% Gaji",
             marker=dict(color="rgba(151,125,255,0.55)", line=dict(width=0)),
@@ -959,7 +1014,11 @@ elif page == 1:
                 bordercolor="rgba(255,255,255,0.18)", borderwidth=1, traceorder="normal"),
             margin=dict(l=10, r=160, t=60, b=10),
             xaxis=dict(title="UMK (Rp)", tickformat=",", **PLOT_LAYOUT["xaxis"]),
-            yaxis=dict(tickfont=dict(size=9.5, color="rgba(255,255,255,0.80)"), **PLOT_LAYOUT["yaxis"]),
+            yaxis=dict(
+                tickfont=dict(size=9.5, color="rgba(255,255,255,0.80)"),
+                categoryorder="array",
+                categoryarray=category_order,
+                **{k: v for k, v in PLOT_LAYOUT["yaxis"].items() if k != "categoryorder"}),
             **{k: v for k, v in PLOT_LAYOUT.items() if k not in ["xaxis","yaxis","margin","legend"]})
         st.plotly_chart(fig3, use_container_width=True)
 
@@ -1354,32 +1413,47 @@ elif page == 6:
                         base[i] = "background:rgba(255,77,109,0.18);color:#FF4D6D;font-weight:700"
             return base
 
-        styled = (tbl.style
-            .apply(style_row, axis=1)
-            .format({"UMK (Rp)":"Rp {:,.0f}","Batas 30% (Rp)":"Rp {:,.0f}",
-                     "Cicilan KPR (Rp)":"Rp {:,.0f}",
-                     "Garis Kemiskinan":"Rp {:,.0f}","Residual Income":"Rp {:,.0f}"})
-            .set_table_styles([
-                {"selector": "thead th",
-                 "props": "background: rgba(151,125,255,0.20) !important; color: white !important;"},
-                {"selector": "tbody td",
-                 "props": "background: rgba(255,255,255,0.04) !important; color: rgba(255,255,255,0.85) !important;"},
-                {"selector": "tbody tr:hover td",
-                 "props": "background: rgba(151,125,255,0.10) !important;"},
-                {"selector": "table",
-                 "props": "background: transparent !important;"},
-                {"selector": "",
-                 "props": "background: transparent !important;"},
-            ]))
-        st.dataframe(styled, use_container_width=True, height=500)
+        # Format kolom angka
+        fmt6 = tbl.copy()
+        for col in ["UMK (Rp)","Batas 30% (Rp)","Cicilan KPR (Rp)","Garis Kemiskinan","Residual Income"]:
+            fmt6[col] = fmt6[col].apply(lambda v: f"Rp {v:,.0f}")
+
+        def status_style(val):
+            if val == "Terjangkau":    return "background:rgba(0,229,160,0.20);color:#00E5A0;font-weight:700"
+            if val == "Tidak Terjangkau": return "background:rgba(255,77,109,0.20);color:#FF4D6D;font-weight:700"
+            return ""
+
+        rows6 = ""
+        for idx, row in fmt6.iterrows():
+            is_sel = is_single and row["Kabupaten/Kota"] == sel_kab
+            row_bg = "background:rgba(255,209,102,0.10);" if is_sel else "background:#0a0a0a;"
+            cells = ""
+            for col in fmt6.columns:
+                val = row[col]
+                if col in ["Status Lajang","Status Kel. Kecil"]:
+                    cell_style = status_style(val) + ";padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.07);font-size:11px;text-align:center;"
+                else:
+                    cell_style = row_bg + "color:rgba(255,255,255,0.85);padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.07);font-size:11px;"
+                cells += f"<td style='{cell_style}'>{val}</td>"
+            rows6 += f"<tr>{cells}</tr>"
+
+        header6 = "".join(f"<th style='background:rgba(151,125,255,0.25);color:white;padding:7px 8px;font-size:10.5px;font-weight:700;text-align:left;border-bottom:1px solid rgba(255,255,255,0.15);white-space:nowrap;'>{c}</th>" for c in fmt6.columns)
+        st.markdown(f"""
+        <div style='overflow:auto;max-height:500px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);'>
+        <table style='width:100%;border-collapse:collapse;background:#0a0a0a;'>
+          <thead style='position:sticky;top:0;z-index:1;'><tr>{header6}</tr></thead>
+          <tbody>{rows6}</tbody>
+        </table></div>
+        """, unsafe_allow_html=True)
 
         if is_single:
             st.caption(f"Baris kuning = {sel_kab.title()} (daerah dipilih)")
 
-        dl_col1, dl_col2 = st.columns([3, 1])
-        with dl_col2:
+        st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
+        _, dl_right = st.columns([5, 1])
+        with dl_right:
             csv = tbl.to_csv(index=False).encode("utf-8")
-            st.download_button("Download CSV", csv,
+            st.download_button("⬇ Download CSV", csv,
                 f"keterjangkauan_jatim_{sel_year}.csv", "text/csv",
                 use_container_width=True)
 
